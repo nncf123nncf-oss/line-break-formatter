@@ -422,7 +422,7 @@ var LB = (function () {
       [['文字数 ' + st.chars], ['Xの目安 ' + st.units + 'ユニット'], ['行数 ' + st.lines]].forEach(function (a) {
         var sp = document.createElement('span'); sp.textContent = a[0]; counts.appendChild(sp);
       });
-      punctState.textContent = 'いまの状態: ' + (state.on ? (m.hadPunct ? '句読点あり' : '句読点なし（そのまま）') : '句読点なし') +
+      punctState.textContent = 'いまの状態: ' + (state.on ? (m.hadPunct ? '句読点あり' : '行末に「。」を付けた状態') : '句読点なし') +
         '／元の文章の句読点: ' + (m.hadPunct ? '「。」' + m.nMaru + '・「、」' + m.nTen : 'ありません');
     }
     if (note !== undefined) msg.textContent = note;
@@ -432,17 +432,23 @@ var LB = (function () {
   function recalc(resetState) {
     state.model = LB.build(src.value); state.srcVal = src.value;
     if (resetState && src.value !== '' && !state.model.tooLong) state.on = state.model.hadPunct;
-    draw(resetState ? '' : undefined);
+    draw('');
   }
-  var wasEmpty = true;
+  // 前の文章の一部を直しただけか、別の文章に貼り替えたかを、先頭と末尾の共通部分で見分ける（貼り替えなら状態を初期に戻す）
+  function replaced(a, b) {
+    if (a === '' || b === '') return true;
+    var k = Math.min(8, a.length, b.length), p = 0, s = 0;
+    while (p < k && a[p] === b[p]) p++;
+    while (s < k && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
+    return p < k && s < k;
+  }
   function onSrc() {
-    var resetState = wasEmpty && src.value !== '';
-    wasEmpty = src.value === '';
+    var resetState = replaced(state.srcVal, src.value);
     recalc(resetState); copyMsg.textContent = '';
   }
   src.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(onSrc, 150); });
-  $('sampleBtn').addEventListener('click', function () { clearTimeout(timer); wasEmpty = true; src.value = LB.SAMPLE; onSrc(); });
-  $('clearBtn').addEventListener('click', function () { clearTimeout(timer); src.value = ''; wasEmpty = true; onSrc(); src.focus(); });
+  $('sampleBtn').addEventListener('click', function () { clearTimeout(timer); state.srcVal = ''; src.value = LB.SAMPLE; onSrc(); });
+  $('clearBtn').addEventListener('click', function () { clearTimeout(timer); src.value = ''; onSrc(); src.focus(); });
 
   document.querySelectorAll('input[name="preset"]').forEach(function (r) {
     r.addEventListener('change', function () {

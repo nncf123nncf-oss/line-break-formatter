@@ -39,6 +39,19 @@ const ok = (c, m) => { n++; if (!c) { f++; console.log('NG', m); } };
   await setSrc('今日は晴れです\n明日は雨です'); await wait();
   ok(await txt('punctBtn') === '句読点を付ける', 'E5 句読点なしの文章 → 付ける');
   await click('punctBtn'); await wait(); ok((await val('out')).includes('今日は晴れです。\n') && (await txt('msg')).includes('「、」は付けていません'), 'E5 行末に。 ' + await txt('msg'));
+  // E5b レビュー指摘: 状態行の表示と、貼り替えでの状態の初期化
+  ok((await txt('punctState')).includes('行末に「。」を付けた状態'), 'E5b 付けた直後の状態行 ' + await txt('punctState'));
+  await setSrc('今日は晴れ。\n明日は雨。'); await wait();   // 全部入れ替え: 句読点あり → on=true のまま行末が増えない・ボタンは外す
+  ok(await txt('punctBtn') === '句読点を外す', 'E5b 貼り替え(句読点なし→あり)でボタンが初期に戻る');
+  await setSrc('今日は晴れです\n明日は雨です'); await wait();
+  ok(!(await val('out')).includes('。') && await txt('punctBtn') === '句読点を付ける', 'E5b 貼り替え(あり→なし)で勝手に「。」が付かない');
+  await setSrc('とてもよい天気です。みなさまお元気ですか。'); await wait(); await click('punctBtn'); await wait();   // 外した状態
+  await setSrc('まったく別の文章です、ここにあります。続きもあります。'); await wait();
+  ok((await val('out')).includes('。') && await txt('punctBtn') === '句読点を外す' && (await txt('msg')) === '', 'E5b 外した状態で貼り替えると初期に戻り、前のメッセージが消える');
+  await setSrc('まったく別の文章です、ここにあります。続きもあります！'); await wait();   // 末尾だけ直す: 状態は維持
+  await click('punctBtn'); await wait(); await setSrc('まったく別の文章です、ここにあります。続きもあります！！'); await wait();
+  ok(await txt('punctBtn') === '句読点を付ける', 'E5b 少し直しただけなら外した状態を保つ');
+  await setSrc('今日は晴れです\n明日は雨です'); await wait(); await click('punctBtn'); await wait();
   // E6 編集 → 上書き確認
   await b.ev(`(()=>{const e=document.getElementById('out');e.value='編集した';e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   ok((await txt('msg')).includes('編集しました'), 'E6 編集の通知');
