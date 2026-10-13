@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1文1行整形</title>
+<meta name="description" content="文章を貼ると、1文ごとに改行して段落の間に空行を入れた形に整えます。ボタン1つで句読点を外す・付けるを切り替えられます。X・Substack・LinkedIn向けの3つの並べ方から選べます。">
+<style>
+  :root {
+    --bg: #f4f6f4; --surface: #ffffff; --ink: #1c211e; --ink2: #3e4741; --ink3: #56605a;
+    --line: #d3dad5; --line-strong: #6f7a73; --accent: #2A6F51; --accent-ink: #ffffff; --accent-soft: #e2f1ea;
+    --danger: #a8231b; --ok: #1b6b34;
+    --font: "Hiragino Sans","Yu Gothic","BIZ UDPGothic","Noto Sans JP",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121614; --surface: #1b211e; --ink: #edf2ee; --ink2: #c5cfc8; --ink3: #a0aca4;
+      --line: #333c37; --line-strong: #7d8981; --accent: #8FD3B0; --accent-ink: #0c2a1d; --accent-soft: #1f3329;
+      --danger: #ff9a92; --ok: #7fd49a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.6; }
+  main { max-width: 1040px; margin: 0 auto; padding: 16px 16px 32px; }
+  h1 { font-size: 22px; line-height: 1.3; margin: 8px 0 8px; }
+  h2 { font-size: 17px; line-height: 1.4; margin: 0 0 8px; }
+  p { margin: 0 0 8px; }
+  a { color: var(--accent); }
+  .lead { color: var(--ink2); }
+  .hint { font-size: 16px; color: var(--ink3); margin: 6px 0 0; }
+  .notes { list-style: none; margin: 12px 0 16px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 6px; font-size: 16px; }
+  .notes li { margin: 0 0 6px; padding-left: 1.5em; text-indent: -1.5em; }
+  .notes li:last-child { margin-bottom: 0; }
+  .notes li::before { content: attr(data-n); display: inline-block; width: 1.5em; text-indent: 0; font-weight: 700; color: var(--accent); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin: 0 0 14px; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  label.lbl { display: block; font-weight: 700; margin: 0 0 6px; }
+  textarea { display: block; width: 100%; font: inherit; font-size: 16px; line-height: 1.7; color: var(--ink); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 6px; padding: 10px; resize: vertical; min-height: 200px; overflow-wrap: anywhere; }
+  #out { min-height: 260px; }
+  button { font: inherit; font-size: 16px; min-height: 44px; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+  #punctBtn { width: 100%; min-height: 56px; font-size: 18px; }
+  fieldset { border: 0; margin: 14px 0 0; padding: 0; min-width: 0; }
+  legend { font-weight: 700; padding: 0; margin: 0 0 6px; }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg label { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); cursor: pointer; flex: 1 1 auto; text-align: center; }
+  .seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .seg label:has(input:checked) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  .seg label:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .state { margin: 8px 0 0; color: var(--ink2); }
+  .msg { min-height: 1.6em; margin: 6px 0 0; color: var(--ink2); overflow-wrap: anywhere; }
+  .msg.err { color: var(--danger); font-weight: 700; }
+  .counts { margin: 8px 0 0; color: var(--ink2); overflow-wrap: anywhere; }
+  .counts span { white-space: nowrap; margin-right: 12px; display: inline-block; }
+  details { margin: 0 0 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+  details ul { margin: 6px 0 10px; padding-left: 1.3em; }
+  details li { margin: 0 0 4px; }
+  .mw-footer { box-sizing: border-box; width: 100%; max-width: 100%; margin: 24px 0 0; padding: 16px; background: #F7F7F8;
+    border: 1px solid #D8D8DC; border-radius: 6px; color: #3A3A3E; font-family: system-ui, sans-serif; font-size: 12px; line-height: 1.7; }
+  .mw-footer p { margin: 0 0 6px; } .mw-footer p:last-child { margin-bottom: 0; } .mw-footer a { color: #0B5AA6; display: inline-block; padding: 13px 0; }
+  .layout { display: block; }
+  @media (min-width: 880px) {
+    main { padding: 24px 16px 40px; }
+    h1 { font-size: 24px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 20px; align-items: start; }
+    .a-out { position: sticky; top: 16px; }
+    #src { min-height: 260px; }
+    #out { min-height: 380px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>1文1行整形</h1>
+  <p class="lead">文章を貼ると、1文ごとに改行して、段落の間に空行を入れた形に整えます。ボタン1つで、句読点を外す・付けるを切り替えられます。</p>
+  <ul class="notes">
+    <li data-n="1">文の切れ目は規則で推定します。切り損ねたり、違う場所で切ったりすることがあります。結果欄は編集できるので、仕上げはご自身の目で確かめてください。</li>
+    <li data-n="2">句読点を「付ける」のは、外す前の位置に戻すときです。最初から句読点がない文章には、行末に「。」だけを付けます。「、」は自動では付けません。</li>
+    <li data-n="3">入力した文章はこのページの中だけで処理し、保存もしません。20000字まで入れられます。</li>
+  </ul>
+
+  <div class="layout">
+    <section class="a-in" aria-label="入力と設定">
+      <div class="panel">
+        <label class="lbl" for="src">整えたい文章を貼る</label>
+        <textarea id="src" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ここに文章を貼ってください"></textarea>
+        <div class="row">
+          <button type="button" id="sampleBtn">サンプルで試す</button>
+          <button type="button" id="clearBtn">空にする</button>
+        </div>
+        <div id="srcMsg" class="msg" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="panel">
+        <fieldset id="presetSet" style="margin-top:0">
+          <legend>並べ方（投稿先の目安）</legend>
+          <div class="seg">
+            <label><input type="radio" name="preset" value="x" checked>X（空行なし）</label>
+            <label><input type="radio" name="preset" value="substack">Substack（文ごとに空行）</label>
+            <label><input type="radio" name="preset" value="linkedin">LinkedIn（2文ごとに空行）</label>
+          </div>
+        </fieldset>
+        <fieldset id="strengthSet">
+          <legend>長い文を句の切れ目で分ける</legend>
+          <div class="seg">
+            <label><input type="radio" name="strength" value="0">なし</label>
+            <label><input type="radio" name="strength" value="1" checked>標準（40字超）</label>
+            <label><input type="radio" name="strength" value="2">細かく（25字超）</label>
+          </div>
+        </fieldset>
+      </div>
+    </section>
+
+    <section class="a-out" aria-label="結果">
+      <div class="panel">
+        <button type="button" id="punctBtn" class="primary" disabled>句読点を外す</button>
+        <p id="punctState" class="state"></p>
+        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+
+        <label class="lbl" for="out" style="margin-top:12px">整形結果（編集できます）</label>
+        <textarea id="out" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="貼った文章を整えた結果がここに出ます"></textarea>
+        <p class="hint">上の文章を変えると、ここで編集した内容は上書きされます。</p>
+        <p id="counts" class="counts"></p>
+        <div class="row"><button type="button" id="copyBtn" disabled>結果をコピー</button></div>
+        <div id="copyMsg" class="msg" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+
+  <details>
+    <summary>見ているもの・見ないもの</summary>
+    <p>見ているもの</p>
+    <ul>
+      <li>「。」「！」「？」の直後での文の切れ目（URL・かぎ括弧の中・小数点・箇条書きの行は切りません）</li>
+      <li>「、」の位置と、句読点を外す・付けるの切り替え（かぎ括弧の中の句読点は変えません）</li>
+      <li>元の空行（段落の区切りとして残します）</li>
+    </ul>
+    <p>見ないもの</p>
+    <ul>
+      <li>誤字・脱字・言い換え・敬語の直し（辞書もAIも使いません）</li>
+      <li>投稿先ごとの文字数の上限や、改行・空行の表示のされ方（調べていません）</li>
+      <li>英文の細かい文の切れ目（簡易版です。略語の後ろで切れることがあります）</li>
+    </ul>
+  </details>
+
+  <footer class="mw-footer">
+    <p>みちAIワークス（MICHI AI WORKS）／代表 田中　泉</p>
+    <p>運営: <a href="https://michi-portfolio.vercel.app/" rel="noopener">みちAIワークス 公式サイト</a>（https://michi-portfolio.vercel.app/ ）／ お問い合わせ: <a href="mailto:nncf123nncf@gmail.com">nncf123nncf@gmail.com</a></p>
+    <p>入力した文章はこのページの中（お使いの端末のブラウザ）だけで処理し、サーバーには送信せず、保存もしません。ページを閉じると消えます。アクセス解析（Cloudflare Web Analytics）で、ページの閲覧状況（閲覧数・参照元・ブラウザの種類など）を計測しています。入力した文章は送信しません。</p>
+    <p>このページは、誤字・名前の間違い・事実の誤りを見つけられません。投稿してよい内容かどうかは、ご自身で確認してください。</p>
+    <p>ログイン・会員登録・パスワードの入力を求めることはありません。</p>
+  </footer>
+</main>
+
+<script id="core">
+/* 整形の部分（画面を使わない）。source/run-checks.js がここだけを取り出して検算する */
+var LB = (function () {
+  'use strict';
+  var MAX = 20000;
+  var WIDE = '__WIDE__'.split(',').map(function (h) { return parseInt(h, 16); });
+  function cpUnits(cp) {
+    var lo = 0, hi = WIDE.length / 2 - 1;
+    while (lo <= hi) { var mid = (lo + hi) >> 1, a = WIDE[mid * 2], b = WIDE[mid * 2 + 1]; if (cp < a) hi = mid - 1; else if (cp > b) lo = mid + 1; else return 2; }
+    return 1;
+  }
+  function cpLen(s) { return Array.from(s).length; }
+  function unitsOf(s) { var n = 0; Array.from(s).forEach(function (ch) { n += cpUnits(ch.codePointAt(0)); }); return n; }
+
+  var SAMPLE = 'みなと堂では、この秋から手ぬぐいの受注を始めました。お客さまから「柄を選ぶのに時間がかかる」という声が多かったので、見本を1枚にまとめたページを作りました。スマホでも見られるので、お店の中でも家でも選べます。\n\n使い方は簡単で、気になる柄をタップするだけです。比べたいときは2つまで並べて見られます。https://minato-do.example/tenugui\n\n詳しくはこちらからどうぞ。ご質問があれば、お気軽にご連絡ください。';
+
+  var JA = /[぀-ヿ㐀-鿿ｦ-ﾟ]/;
+  var CLOSERS = '」』）)】';
+  var PH0 = '', PH1 = '';
+  var TERM_JA = { '。': 1, '．': 1 };
+  var COMMA = { '、': 1, '，': 1 };
+
+  function maskUrls(line) {
+    var urls = [];
+    var m = line.replace(/https?:\/\/[A-Za-z0-9\-._~:\/?#\[\]@!$&'()*+,;=%]+/g, function (u) {
+      var tail = '';
+      var mm = u.match(/[.,;:!?)']+$/);
+      if (mm) { tail = mm[0]; u = u.slice(0, u.length - tail.length); }
+      urls.push(u);
+      return PH0 + (urls.length - 1) + PH1 + tail;
+    });
+    return { s: m, urls: urls };
+  }
+  function unmask(s, urls) { return s.replace(/(\d+)/g, function (_, i) { return urls[+i]; }); }
+  function trimJ(s) { return s.replace(/^[ \t　]+|[ \t　]+$/g, ''); }
+
+  var BULLET = /^[ \t　]*(?:[・•●◦▪‣▶►■□◆◇✓✔☑]|[-–—*]\s|\d{1,3}[.)．）](?!\d)|[①-⑳⑴-⒇])/;
+  var HASHLINE = /^(?:[ \t　]*[#＃][^\s#＃]+)+[ \t　]*$/;
+  var URLLINE = /^[ \t　]*\d+[ \t　]*$/;
+
+  function balanced(s) {
+    var d = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s[i];
+      if (c === '「' || c === '『') d++; else if (c === '」' || c === '』') { d--; if (d < 0) return false; }
+    }
+    return d === 0;
+  }
+
+  // 1行を文に分ける。[{body, term, cl}]  term は 。 などの文末の句点（本文には含めない）、cl は句点のあとの閉じ括弧
+  function splitSentences(s) {
+    var useBr = balanced(s), out = [], buf = '', depth = 0, i = 0, n = s.length;
+    function push(body, term, cl) { if (trimJ(body) !== '') out.push({ body: trimJ(body), term: term, cl: cl }); }
+    while (i < n) {
+      var c = s[i], prev = i > 0 ? s[i - 1] : '';
+      if (useBr) { if (c === '「' || c === '『') depth++; else if ((c === '」' || c === '』') && depth > 0) depth--; }
+      buf += c; i++;
+      if (depth > 0) continue;
+      var jaTerm = TERM_JA[c] === 1 || (c === '.' && JA.test(prev) && (i >= n || /[\s　]/.test(s[i]) || CLOSERS.indexOf(s[i]) >= 0));
+      if (jaTerm) {
+        var run = 1; while (i + run - 1 < n && s[i + run - 1] === c) run++;
+        run--; // 直後に続く同じ記号の数
+        if (run >= 1) { buf += s.substr(i, run); i += run; continue; } // 。。。 のような連続は文末にしない
+        var cl = ''; while (i < n && CLOSERS.indexOf(s[i]) >= 0) { cl += s[i]; i++; }
+        push(buf.slice(0, -1), c, cl); buf = '';
+        while (i < n && /[ \t　]/.test(s[i])) i++;
+        continue;
+      }
+      var excl = c === '！' || c === '？' || ((c === '!' || c === '?') && (i >= n || !/[A-Za-z0-9_=&%\/.\-]/.test(s[i])));
+      if (excl) {
+        while (i < n && /[！？!?]/.test(s[i])) { buf += s[i]; i++; }
+        while (i < n && CLOSERS.indexOf(s[i]) >= 0) { buf += s[i]; i++; }
+        push(buf, '', ''); buf = '';
+        while (i < n && /[ \t　]/.test(s[i])) i++;
+        continue;
+      }
+      if (c === '.' && /[A-Za-z0-9)\]"']/.test(prev) && s[i] === ' ' && /[A-Z]/.test(s[i + 1] || '')) {
+        push(buf, '', ''); buf = ''; while (i < n && s[i] === ' ') i++;
+      }
+    }
+    push(buf, '', '');
+    return out;
+  }
+
+  // 本文を読点で分ける。 [{t, p}]  p はそのあとの句読点（最後の部分は文末の句点）
+  function splitComma(body, term, every) {
+    var parts = [], cur = '', depth = 0, useBr = balanced(body);
+    for (var i = 0; i < body.length; i++) {
+      var c = body[i];
+      if (useBr) { if (c === '「' || c === '『') depth++; else if ((c === '」' || c === '』') && depth > 0) depth--; }
+      var isComma = depth === 0 && (COMMA[c] === 1 || (c === ',' && JA.test(body[i - 1] || '') && !/\d/.test(body[i + 1] || '')));
+      var isMaru = every && depth === 0 && TERM_JA[c] === 1;
+      if (isComma || isMaru) {
+        if (cur === '' && parts.length) parts[parts.length - 1].p += c;
+        else { parts.push({ t: trimJ(cur), p: c }); }
+        cur = '';
+      } else cur += c;
+    }
+    if (trimJ(cur) !== '' || !parts.length) parts.push({ t: trimJ(cur), p: term });
+    else if (term) parts[parts.length - 1].p += term;
+    return parts;
+  }
+
+  function parseLine(line) {
+    var mk = maskUrls(line), ms = mk.s, urls = mk.urls, U = function (x) { return unmask(x, urls); };
+    if (HASHLINE.test(ms) || URLLINE.test(ms)) return [{ kind: 'keep', raw: U(trimJ(ms)) }];
+    if (BULLET.test(ms)) {
+      var parts = splitComma(trimJ(ms), '', true);
+      parts.forEach(function (p) { p.t = U(p.t); });
+      return [{ kind: 'bullet', parts: parts, cl: '' }];
+    }
+    return splitSentences(ms).map(function (sn) {
+      var parts = splitComma(sn.body, sn.term, false);
+      parts.forEach(function (p) { p.t = U(p.t); });
+      return { kind: 'sent', parts: parts, cl: sn.cl };
+    });
+  }
+
+  function build(src) {
+    var s = String(src).replace(/\r\n?/g, '\n');
+    var m = { paras: [], hadPunct: false, nMaru: 0, nTen: 0, tooLong: false, len: cpLen(s) };
+    if (m.len > MAX) { m.tooLong = true; return m; }
+    var cur = [];
+    s.split('\n').forEach(function (line) {
+      if (/^[ \t　]*$/.test(line)) { if (cur.length) { m.paras.push(cur); cur = []; } return; }
+      parseLine(line).forEach(function (u) { cur.push(u); });
+    });
+    if (cur.length) m.paras.push(cur);
+    m.paras.forEach(function (ps) { ps.forEach(function (u) {
+      if (u.kind === 'keep') return;
+      u.parts.forEach(function (p) {
+        for (var i = 0; i < p.p.length; i++) { var c = p.p[i]; if (TERM_JA[c] === 1 || c === '.') m.nMaru++; else if (COMMA[c] === 1 || c === ',') m.nTen++; }
+      });
+    }); });
+    m.hadPunct = m.nMaru + m.nTen > 0;
+    return m;
+  }
+
+  function plainLen(u) { return u.kind === 'keep' ? cpLen(u.raw) : u.parts.reduce(function (a, p) { return a + cpLen(p.t); }, 0); }
+  function eligible(u) {
+    var txt = u.parts.map(function (p) { return p.t; }).join('') + u.cl;
+    if (!JA.test(txt)) return false;
+    if (/[！？!?）)」』】…:：、,，]$/.test(txt)) return false;
+    if (/[A-Za-z0-9\/_\-=%#]$/.test(txt)) return false;
+    if (/[\u{1F000}-\u{1FFFF}☀-➿️]$/u.test(txt)) return false;
+    if (/[#＃][^\s]*$/.test(txt)) return false;
+    return true;
+  }
+  var CONN = /(けど|ので|ながら|として)(?=[^\s])/g;
+  function expandSoft(parts) {
+    var t = parts[0].t, res = [], last = 0, m;
+    CONN.lastIndex = 0;
+    while ((m = CONN.exec(t)) !== null) {
+      var end = m.index + m[0].length;
+      if (cpLen(t.slice(last, end)) >= 5 && cpLen(t.slice(end)) >= 5) { res.push({ t: t.slice(last, end), p: '', soft: true }); last = end; }
+    }
+    if (!res.length) return parts;
+    res.push({ t: t.slice(last), p: parts[0].p });
+    return res;
+  }
+  var PARTICLE = /^[はがをにでもの]/;
+
+  function renderUnit(u, o) {
+    if (u.kind === 'keep') return [u.raw];
+    var P = u.parts, last = P.length - 1, i;
+    if (u.kind === 'bullet') {
+      if (o.on) return [P.map(function (p) { return p.t + p.p; }).join('')];
+      return [P.map(function (p) { return p.t; }).filter(function (t) { return t !== ''; }).join(' ')];
+    }
+    var isLong = o.thr > 0 && plainLen(u) > o.thr;
+    var P2 = P;
+    if (isLong && P.length === 1) P2 = expandSoft(P);
+    last = P2.length - 1;
+    var lines = [];
+    if (o.on) {
+      var endp = P[P.length - 1].p;
+      if (!endp && o.auto && eligible(u)) { endp = '。'; o.added++; }
+      var segs = P2.map(function (p, k) { return p.t + (k < last ? p.p : endp); });
+      segs[last] += u.cl;
+      if (!isLong) return [segs.join('')];
+      var cur = '', curLen = 0, rest = P2.reduce(function (a, p) { return a + cpLen(p.t); }, 0);
+      for (i = 0; i <= last; i++) {
+        cur += segs[i]; curLen += cpLen(P2[i].t); rest -= cpLen(P2[i].t);
+        if (i < last && (P2[i].p || P2[i].soft) && curLen >= 5 && rest >= 5) { lines.push(cur); cur = ''; curLen = 0; }
+      }
+      if (cur !== '') lines.push(cur);
+      return lines;
+    }
+    var line = P2[0].t;
+    for (i = 0; i < last; i++) {
+      var p = P2[i], next = P2[i + 1].t, soft = !!p.soft;
+      var join = soft ? '\n' : ((cpLen(p.t) < 5 || PARTICLE.test(next)) ? ' ' : '\n');
+      if (join === '\n') { lines.push(line); line = next; } else line += ' ' + next;
+    }
+    lines.push(line + u.cl);
+    return lines.filter(function (l, k) { return l !== '' || lines.length === 1; });
+  }
+
+  var DEFAULT_STRENGTH = { x: 1, substack: 1, linkedin: 0 };
+  // o: {preset:'x'|'substack'|'linkedin', strength:0|1|2, on:bool}
+  function render(m, o) {
+    var ro = { on: !!o.on, auto: !m.hadPunct, thr: [0, 40, 25][o.strength | 0] || 0, added: 0 };
+    var paras = m.paras.map(function (units) {
+      var s = '', count = 0;
+      units.forEach(function (u, idx) {
+        var text = renderUnit(u, ro).join('\n');
+        if (idx > 0) {
+          var prev = units[idx - 1], bb = prev.kind === 'bullet' && u.kind === 'bullet', blank;
+          if (o.preset === 'substack') blank = !bb;
+          else if (o.preset === 'linkedin') { blank = count >= 2 && !bb; if (blank) count = 0; }
+          else blank = false;
+          s += blank ? '\n\n' : '\n';
+        }
+        s += text;
+        if (o.preset === 'linkedin' && u.kind === 'sent' && plainLen(u) >= 10) count++;
+      });
+      return s;
+    });
+    return { text: paras.join('\n\n'), added: ro.added };
+  }
+  function stats(text) {
+    var lines = text === '' ? 0 : text.split('\n').filter(function (l) { return l !== ''; }).length;
+    return { chars: cpLen(text), units: unitsOf(text), lines: lines };
+  }
+  return { MAX: MAX, SAMPLE: SAMPLE, build: build, render: render, stats: stats, DEFAULT_STRENGTH: DEFAULT_STRENGTH, cpUnits: cpUnits, cpLen: cpLen };
+})();
+</script>
+
+<script id="ui">
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  var src = $('src'), out = $('out'), punctBtn = $('punctBtn'), msg = $('msg'), srcMsg = $('srcMsg'),
+      counts = $('counts'), copyBtn = $('copyBtn'), copyMsg = $('copyMsg'), punctState = $('punctState');
+  var state = { preset: 'x', strength: 1, on: true, model: null, srcVal: '', edited: false };
+  var timer = null;
+
+  function radio(name) { var r = document.querySelector('input[name="' + name + '"]:checked'); return r ? r.value : null; }
+  function setRadio(name, v) { var r = document.querySelector('input[name="' + name + '"][value="' + v + '"]'); if (r) r.checked = true; }
+  function confirmOverwrite() {
+    if (!state.edited) return true;
+    if (window.confirm('結果欄で編集した内容は上書きされます。続けますか？')) { state.edited = false; return true; }
+    return false;
+  }
+
+  function draw(note) {
+    var m = state.model;
+    srcMsg.textContent = ''; srcMsg.className = 'msg';
+    if (m.tooLong) {
+      out.value = ''; counts.textContent = '';
+      srcMsg.textContent = '20000字を超えています（いま' + m.len + '字）。分けて貼ってください。'; srcMsg.className = 'msg err';
+      punctBtn.disabled = true; copyBtn.disabled = true; punctState.textContent = ''; msg.textContent = '';
+      return;
+    }
+    var empty = m.paras.length === 0;
+    punctBtn.disabled = empty; copyBtn.disabled = empty;
+    punctBtn.textContent = state.on ? '句読点を外す' : '句読点を付ける';
+    var r = LB.render(m, { preset: state.preset, strength: state.strength, on: state.on });
+    out.value = r.text; state.edited = false;
+    var st = LB.stats(r.text);
+    if (empty) { counts.textContent = ''; punctState.textContent = ''; }
+    else {
+      counts.innerHTML = '';
+      [['文字数 ' + st.chars], ['Xの目安 ' + st.units + 'ユニット'], ['行数 ' + st.lines]].forEach(function (a) {
+        var sp = document.createElement('span'); sp.textContent = a[0]; counts.appendChild(sp);
+      });
+      punctState.textContent = 'いまの状態: ' + (state.on ? (m.hadPunct ? '句読点あり' : '句読点なし（そのまま）') : '句読点なし') +
+        '／元の文章の句読点: ' + (m.hadPunct ? '「。」' + m.nMaru + '・「、」' + m.nTen : 'ありません');
+    }
+    if (note !== undefined) msg.textContent = note;
+    else if (empty) msg.textContent = '';
+  }
+
+  function recalc(resetState) {
+    state.model = LB.build(src.value); state.srcVal = src.value;
+    if (resetState && src.value !== '' && !state.model.tooLong) state.on = state.model.hadPunct;
+    draw(resetState ? '' : undefined);
+  }
+  var wasEmpty = true;
+  function onSrc() {
+    var resetState = wasEmpty && src.value !== '';
+    wasEmpty = src.value === '';
+    recalc(resetState); copyMsg.textContent = '';
+  }
+  src.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(onSrc, 150); });
+  $('sampleBtn').addEventListener('click', function () { clearTimeout(timer); wasEmpty = true; src.value = LB.SAMPLE; onSrc(); });
+  $('clearBtn').addEventListener('click', function () { clearTimeout(timer); src.value = ''; wasEmpty = true; onSrc(); src.focus(); });
+
+  document.querySelectorAll('input[name="preset"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      if (!confirmOverwrite()) { setRadio('preset', state.preset); return; }
+      state.preset = radio('preset'); state.strength = LB.DEFAULT_STRENGTH[state.preset]; setRadio('strength', state.strength);
+      draw('並べ方を変えました'); copyMsg.textContent = '';
+    });
+  });
+  document.querySelectorAll('input[name="strength"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      if (!confirmOverwrite()) { setRadio('strength', state.strength); return; }
+      state.strength = +radio('strength'); draw('分け方を変えました'); copyMsg.textContent = '';
+    });
+  });
+  punctBtn.addEventListener('click', function () {
+    var m = state.model; if (!m || punctBtn.disabled) return;
+    if (!confirmOverwrite()) return;
+    state.on = !state.on;
+    var r = LB.render(m, { preset: state.preset, strength: state.strength, on: state.on }), note;
+    if (!state.on) note = '句読点を外しました（。' + m.nMaru + 'か所、、' + m.nTen + 'か所）';
+    else if (m.hadPunct) note = '句読点を元に戻しました（。' + m.nMaru + 'か所、、' + m.nTen + 'か所）';
+    else note = '行末に「。」を' + r.added + 'か所付けました（「、」は付けていません）';
+    draw(note); copyMsg.textContent = '';
+  });
+  out.addEventListener('input', function () {
+    state.edited = true; msg.textContent = '結果欄を編集しました。ボタンや並べ方を変えると、編集した内容は上書きされます。';
+    var st = LB.stats(out.value); counts.textContent = '文字数 ' + st.chars + '　Xの目安 ' + st.units + 'ユニット　行数 ' + st.lines;
+  });
+
+  function fallbackCopy() {
+    var ok = false;
+    try { out.focus(); out.select(); out.setSelectionRange(0, out.value.length); ok = document.execCommand && document.execCommand('copy'); } catch (e) { ok = false; }
+    copyMsg.textContent = ok ? 'コピーしました' : 'コピーできませんでした。結果欄を選択したので、長押ししてコピーしてください';
+  }
+  copyBtn.addEventListener('click', function () {
+    var text = out.value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { copyMsg.textContent = 'コピーしました'; }, fallbackCopy);
+    } else fallbackCopy();
+  });
+
+  state.model = LB.build('');
+  draw();
+})();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon='{"token": "b4c9f7e78daf4edb84ef52b88633f649"}'></script>
+</body>
+</html>
